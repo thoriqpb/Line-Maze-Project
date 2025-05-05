@@ -168,36 +168,12 @@ void showAbout() {
 }
 
 // Placeholder functions for menu actions
-vvoid rightModeSearch() {
+void rightModeSearch() {
   display.clearDisplay();
-  display.setCursor(0, 0);
-  display.println("Reading A4...");
-  display.println("Press Cancel to exit");
+  display.setCursor(0,0);
+  display.println("Starting Right mode");
   display.display();
-
-  // Disable I2C so A4 becomes analog input
-  TWCR &= ~(1 << TWEN); // Disable I2C
-
-  while (digitalRead(BUTTON_CANCEL) == HIGH) {
-    int sensorValue = analogRead(A4);
-    Serial.print("A4: ");
-    Serial.println(sensorValue);
-    delay(300); // avoid flooding Serial Monitor
-  }
-
-  // Re-enable I2C for OLED
-  TWCR |= (1 << TWEN); // Enable I2C
-
-  // Reinitialize OLED (required after disabling I2C)
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-  display.clearDisplay();
-  display.setCursor(0, 0);
-  display.println("Returning to Menu...");
-  display.display();
-  delay(1000); // Pause before going back
-
-  menuState = MAIN_MENU;  // Return to main menu
-  selectedItem = 0;       // Reset selection
+  delay(1000);
 }
 
 
