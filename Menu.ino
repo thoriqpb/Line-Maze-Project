@@ -7,10 +7,13 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 // Button Pins
-#define BUTTON_UP 9
-#define BUTTON_DOWN 10
-#define BUTTON_OK 11
-#define BUTTON_CANCEL 12
+#define BUTTON_UP 12
+#define BUTTON_DOWN 11
+#define BUTTON_OK 10
+#define BUTTON_CANCEL 9
+
+// Buzzer Pin
+#define BUZZER_PIN 8
 
 enum MenuState { MAIN_MENU, SUB_MENU, ABOUT_SCREEN };
 MenuState menuState = MAIN_MENU;
@@ -27,7 +30,11 @@ const unsigned long debounceDelay = 300;
 
 void setup() {
   Serial.begin(9600);
-  
+
+  // Initialize buzzer pin
+  pinMode(BUZZER_PIN, OUTPUT);
+  startupBeep();  // Startup sound
+
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println(F("SSD1306 allocation failed"));
     for(;;);
@@ -47,12 +54,29 @@ void loop() {
   drawMenu();
 }
 
+// Buzzer control functions
+void shortBeep() {
+  digitalWrite(BUZZER_PIN, HIGH);
+  delay(10);
+  digitalWrite(BUZZER_PIN, LOW);
+}
+
+void startupBeep() {
+  for (int i = 0; i < 3; i++) {
+    digitalWrite(BUZZER_PIN, HIGH);
+    delay(100);
+    digitalWrite(BUZZER_PIN, LOW);
+    delay(100);
+  }
+}
+
 void handleButtons() {
   if ((millis() - lastDebounceTime) < debounceDelay) return;
 
   if (menuState == ABOUT_SCREEN) {
     if (digitalRead(BUTTON_CANCEL) == LOW || digitalRead(BUTTON_OK) == LOW) {
       menuState = MAIN_MENU;
+      shortBeep();
       lastDebounceTime = millis();
     }
     return;
@@ -61,19 +85,23 @@ void handleButtons() {
   if (digitalRead(BUTTON_UP) == LOW) {
     selectedItem--;
     if (selectedItem < 0) selectedItem = (menuState == MAIN_MENU) ? mainMenuCount - 1 : subMenuCount - 1;
+    shortBeep();
     lastDebounceTime = millis();
   }
   else if (digitalRead(BUTTON_DOWN) == LOW) {
     selectedItem++;
     int maxItems = (menuState == MAIN_MENU) ? mainMenuCount - 1 : subMenuCount - 1;
     if (selectedItem > maxItems) selectedItem = 0;
+    shortBeep();
     lastDebounceTime = millis();
   }
   else if (digitalRead(BUTTON_OK) == LOW) {
+    shortBeep();
     handleOK();
     lastDebounceTime = millis();
   }
   else if (digitalRead(BUTTON_CANCEL) == LOW) {
+    shortBeep();
     if (menuState == SUB_MENU) {
       menuState = MAIN_MENU;
       selectedItem = 0;
@@ -81,6 +109,10 @@ void handleButtons() {
     lastDebounceTime = millis();
   }
 }
+
+// Remaining functions unchanged from original code...
+// [Keep all other functions (handleOK, drawMenu, drawCenteredMenu, showAbout, etc.) exactly as they were]
+// ... (Rest of the code remains unchanged)
 
 void handleOK() {
   if (menuState == MAIN_MENU) {
@@ -167,7 +199,6 @@ void showAbout() {
   display.println("Press Back to Return");
 }
 
-// Placeholder functions for menu actions
 void rightModeSearch() {
   display.clearDisplay();
   display.setCursor(0,0);
@@ -175,8 +206,6 @@ void rightModeSearch() {
   display.display();
   delay(1000);
 }
-
-
 
 void leftModeSearch() {
   display.clearDisplay();
