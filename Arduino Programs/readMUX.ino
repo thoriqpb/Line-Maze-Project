@@ -1,4 +1,4 @@
-const int selectPins[] = {4, 3, 2}; // S1, S2, S3
+const int selectPins[] = {2, 3, 4}; // S1, S2, S3
 const int analogPin = A0;
 
 void setup() {
@@ -12,11 +12,6 @@ void loop() {
   for (int channel = 0; channel < 8; channel++) {
     selectChannel(channel);
     int value = analogRead(analogPin);
-
-    if (channel == 1) {
-      value -= 800;
-    }
-
     Serial.print(value);
     Serial.print("\t"); 
   }
