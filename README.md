@@ -80,7 +80,7 @@ Enable the robot to:
 - Arduino IDE / PlatformIO
 - Adafruit SSD1306 (for OLED)
 - Timer library / AnalogRead
-- Custom PWM logic for motor speed (non-`ledc`)
+- Custom PWM logic for motor speed
 
 ---
 
@@ -88,8 +88,6 @@ Enable the robot to:
 
 - ⚙️ PID control for smoother movement
 - 📍 Map memory optimization
-- 📡 Wireless debugging (Bluetooth?)
-- 🔋 Power consumption monitor
 
 ---
 
