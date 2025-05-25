@@ -8,22 +8,25 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 // Button Pins
 #define BUTTON_UP 12
-#define BUTTON_DOWN 11
-#define BUTTON_OK 10
+#define BUTTON_DOWN 16
+#define BUTTON_OK 17
 #define BUTTON_CANCEL 9
 
 // Buzzer Pin
 #define BUZZER_PIN 8
 
-enum MenuState { MAIN_MENU, SUB_MENU, ABOUT_SCREEN };
+// Menu states
+enum MenuState { MAIN_MENU, MAZE_SUB_MENU, ABOUT_SCREEN };
 MenuState menuState = MAIN_MENU;
 
-const char* mainMenuItems[] = {"Search Path", "Play Path", "Reset Path", "About"};
-const char* searchSubMenu[] = {"Right mode search", "Left mode search"};
+// Menu items
+const char* mainMenuItems[] = {"Line Follower Mode", "Line Maze Mode", "About"};
+const int mainMenuCount = 3;
+
+const char* mazeSubMenu[] = {"Search Path", "Play Path", "Reset Path"};
+const int mazeSubMenuCount = 3;
 
 int selectedItem = 0;
-const int mainMenuCount = 4;
-const int subMenuCount = 2;
 
 unsigned long lastDebounceTime = 0;
 const unsigned long debounceDelay = 300;
@@ -31,9 +34,8 @@ const unsigned long debounceDelay = 300;
 void setup() {
   Serial.begin(9600);
 
-  // Initialize buzzer pin
   pinMode(BUZZER_PIN, OUTPUT);
-  startupBeep();  // Startup sound
+  startupBeep();
 
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println(F("SSD1306 allocation failed"));
@@ -54,7 +56,7 @@ void loop() {
   drawMenu();
 }
 
-// Buzzer control functions
+// Buzzer functions
 void shortBeep() {
   digitalWrite(BUZZER_PIN, HIGH);
   delay(10);
@@ -70,12 +72,14 @@ void startupBeep() {
   }
 }
 
+// Button handling
 void handleButtons() {
   if ((millis() - lastDebounceTime) < debounceDelay) return;
 
   if (menuState == ABOUT_SCREEN) {
     if (digitalRead(BUTTON_CANCEL) == LOW || digitalRead(BUTTON_OK) == LOW) {
       menuState = MAIN_MENU;
+      selectedItem = 0;
       shortBeep();
       lastDebounceTime = millis();
     }
@@ -84,25 +88,28 @@ void handleButtons() {
 
   if (digitalRead(BUTTON_UP) == LOW) {
     selectedItem--;
-    if (selectedItem < 0) selectedItem = (menuState == MAIN_MENU) ? mainMenuCount - 1 : subMenuCount - 1;
+    int maxItems = (menuState == MAIN_MENU) ? mainMenuCount - 1 :
+                   (menuState == MAZE_SUB_MENU) ? mazeSubMenuCount - 1 : 0;
+    if (selectedItem < 0) selectedItem = maxItems;
     shortBeep();
     lastDebounceTime = millis();
-  }
+  } 
   else if (digitalRead(BUTTON_DOWN) == LOW) {
     selectedItem++;
-    int maxItems = (menuState == MAIN_MENU) ? mainMenuCount - 1 : subMenuCount - 1;
+    int maxItems = (menuState == MAIN_MENU) ? mainMenuCount - 1 :
+                   (menuState == MAZE_SUB_MENU) ? mazeSubMenuCount - 1 : 0;
     if (selectedItem > maxItems) selectedItem = 0;
     shortBeep();
     lastDebounceTime = millis();
-  }
+  } 
   else if (digitalRead(BUTTON_OK) == LOW) {
     shortBeep();
     handleOK();
     lastDebounceTime = millis();
-  }
+  } 
   else if (digitalRead(BUTTON_CANCEL) == LOW) {
     shortBeep();
-    if (menuState == SUB_MENU) {
+    if (menuState != MAIN_MENU) {
       menuState = MAIN_MENU;
       selectedItem = 0;
     }
@@ -110,60 +117,67 @@ void handleButtons() {
   }
 }
 
-// Remaining functions unchanged from original code...
-// [Keep all other functions (handleOK, drawMenu, drawCenteredMenu, showAbout, etc.) exactly as they were]
-// ... (Rest of the code remains unchanged)
-
+// OK button handling
 void handleOK() {
-  if (menuState == MAIN_MENU) {
-    switch(selectedItem) {
-      case 0: 
-        menuState = SUB_MENU;
-        selectedItem = 0;
-        break;
-      case 1: playPath(); break;
-      case 2: resetPath(); break;
-      case 3: 
-        menuState = ABOUT_SCREEN;
-        break;
-    }
-  }
-  else if (menuState == SUB_MENU) {
-    switch(selectedItem) {
-      case 0: rightModeSearch(); break;
-      case 1: leftModeSearch(); break;
-    }
-    menuState = MAIN_MENU;
+  switch (menuState) {
+    case MAIN_MENU:
+      switch (selectedItem) {
+        case 0: // Line Follower Mode
+          lineFollowerMode();
+          break;
+        case 1: // Line Maze Mode
+          menuState = MAZE_SUB_MENU;
+          selectedItem = 0;
+          break;
+        case 2: // About
+          menuState = ABOUT_SCREEN;
+          break;
+      }
+      break;
+
+    case MAZE_SUB_MENU:
+      switch (selectedItem) {
+        case 0: searchPath(); break;
+        case 1: playPath(); break;
+        case 2: resetPath(); break;
+      }
+      menuState = MAIN_MENU;
+      selectedItem = 0;
+      break;
+
+    case ABOUT_SCREEN:
+      menuState = MAIN_MENU;
+      selectedItem = 0;
+      break;
   }
 }
 
+// Drawing the menu
 void drawMenu() {
   display.clearDisplay();
-  
+
   if (menuState == MAIN_MENU) {
     drawCenteredMenu(mainMenuItems, mainMenuCount, "Main Menu");
   } 
-  else if (menuState == SUB_MENU) {
-    drawCenteredMenu(searchSubMenu, subMenuCount, "Search Mode");
+  else if (menuState == MAZE_SUB_MENU) {
+    drawCenteredMenu(mazeSubMenu, mazeSubMenuCount, "Line Maze");
   }
   else if (menuState == ABOUT_SCREEN) {
     showAbout();
   }
-  
+
   display.display();
 }
 
 void drawCenteredMenu(const char* items[], int count, const char* title) {
   int16_t x, y;
   uint16_t w, h;
-  
-  // Draw title with underline
+
   display.getTextBounds(title, 0, 0, &x, &y, &w, &h);
-  display.setCursor((SCREEN_WIDTH - w)/2, 2);
+  display.setCursor((SCREEN_WIDTH - w) / 2, 2);
   display.print(title);
   display.drawFastHLine(0, 12, SCREEN_WIDTH, SSD1306_WHITE);
 
-  // Menu items positioning
   int startY = (SCREEN_HEIGHT - (count * 10)) / 2;
   if (startY < 16) startY = 16;
 
@@ -178,16 +192,16 @@ void drawCenteredMenu(const char* items[], int count, const char* title) {
     } else {
       display.setTextColor(SSD1306_WHITE);
     }
-    
+
     display.setCursor(xPos, yPos);
     display.print(items[i]);
   }
   display.setTextColor(SSD1306_WHITE);
 }
 
+// About screen
 void showAbout() {
   display.clearDisplay();
-  
   display.setTextSize(1);
   display.setCursor(0, 2);
   display.println("     Team Member  ");
@@ -199,25 +213,26 @@ void showAbout() {
   display.println("Press Back to Return");
 }
 
-void rightModeSearch() {
+// Action functions
+void lineFollowerMode() {
   display.clearDisplay();
-  display.setCursor(0,0);
-  display.println("Starting Right mode");
+  display.setCursor(0, 0);
+  display.println("Starting Line Follower...");
   display.display();
   delay(1000);
 }
 
-void leftModeSearch() {
+void searchPath() {
   display.clearDisplay();
-  display.setCursor(0,0);
-  display.println("Starting Left mode");
+  display.setCursor(0, 0);
+  display.println("Searching path...");
   display.display();
   delay(1000);
 }
 
 void playPath() {
   display.clearDisplay();
-  display.setCursor(0,0);
+  display.setCursor(0, 0);
   display.println("Playing path...");
   display.display();
   delay(1000);
@@ -225,7 +240,7 @@ void playPath() {
 
 void resetPath() {
   display.clearDisplay();
-  display.setCursor(0,0);
+  display.setCursor(0, 0);
   display.println("Resetting path...");
   display.display();
   delay(1000);
