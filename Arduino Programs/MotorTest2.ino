@@ -1,7 +1,9 @@
-#define MOTOR_PIN1 5    // Motor A IN1
-#define MOTOR_PIN2 6    // Motor A IN2
-#define MOTOR_PIN3 16   // Motor B IN1
-#define MOTOR_PIN4 17   // Motor B IN2
+#define MOTOR_PIN1 6    // Motor A IN1 (Right)
+#define MOTOR_PIN2 5    // Motor A IN2 (Right)
+#define MOTOR_PIN3 10     // Motor B IN1 (Left)
+#define MOTOR_PIN4 11     // Motor B IN2 (Left)
+
+const float maxSpeed = 80;
 
 void setup() {
   pinMode(MOTOR_PIN1, OUTPUT);
@@ -17,7 +19,7 @@ void setup() {
 
 void loop() {
   // Forward
-  for (int speed = 0; speed <= 255; speed++) {
+  for (int speed = 0; speed <= maxSpeed; speed++) {
     analogWrite(MOTOR_PIN1, speed);
     analogWrite(MOTOR_PIN3, speed);
     analogWrite(MOTOR_PIN2, 0);
@@ -27,15 +29,15 @@ void loop() {
   delay(1000);
 
   // Stop
-  for (int speed = 255; speed >= 0; speed--) {
+  for (int speed = maxSpeed; speed >= 0; speed--) {
     analogWrite(MOTOR_PIN1, speed);
     analogWrite(MOTOR_PIN3, speed);
     delay(20);
   }
-  delay(300);
+  // delay(300);
 
   // Reverse
-  for (int speed = 0; speed <= 255; speed++) {
+  for (int speed = 0; speed <= maxSpeed; speed++) {
     analogWrite(MOTOR_PIN2, speed);
     analogWrite(MOTOR_PIN4, speed);
     analogWrite(MOTOR_PIN1, 0);
@@ -45,10 +47,10 @@ void loop() {
   delay(1000);
 
   // Stop
-  for (int speed = 255; speed >= 0; speed--) {
+  for (int speed = maxSpeed; speed >= 0; speed--) {
     analogWrite(MOTOR_PIN2, speed);
     analogWrite(MOTOR_PIN4, speed);
     delay(20);
   }
-  delay(300);
+  // delay(300);
 }

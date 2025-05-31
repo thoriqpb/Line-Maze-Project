@@ -1,11 +1,9 @@
-// Program untuk mengendalikan motor DC menggunakan H-Bridge pada Arduino Nano
-// Pin D5 dan D6 digunakan untuk kontrol H-Bridge
+#define MOTOR_PIN1 6    // Motor A IN1 (Right)
+#define MOTOR_PIN2 5    // Motor A IN2 (Right)
+#define MOTOR_PIN3 10     // Motor B IN1 (Left)
+#define MOTOR_PIN4 11     // Motor B IN2 (Left)
 
-#define MOTOR_PIN1 5    // Pin D5 untuk kontrol H-Bridge (IN1)
-#define MOTOR_PIN2 6    // Pin D6 untuk kontrol H-Bridge (IN2)
-#define MOTOR_PIN3 16    // Pin D5 untuk kontrol H-Bridge (IN1)
-#define MOTOR_PIN4 17    // Pin D6 untuk kontrol H-Bridge (IN2)
-
+const float speed = 50;
 
 void setup() {
   // Mengatur pin sebagai output
@@ -15,11 +13,18 @@ void setup() {
   pinMode(MOTOR_PIN4, OUTPUT);
   
   // Memastikan motor berhenti saat startup
-  digitalWrite(MOTOR_PIN1, 0); // 5
-  digitalWrite(MOTOR_PIN2, 1); // 6
-  digitalWrite(MOTOR_PIN3, 0); // 16
-  digitalWrite(MOTOR_PIN4, 1); // 17 
+  // analogWrite(MOTOR_PIN1, speed); // 
+  // analogWrite(MOTOR_PIN2, 0); // 
+  // analogWrite(MOTOR_PIN3, speed); // 
+  // analogWrite(MOTOR_PIN4, 0); //   
+
+  analogWrite(MOTOR_PIN1, 0); // 
+  analogWrite(MOTOR_PIN2, speed); // 
+  analogWrite(MOTOR_PIN3, 0); // 
+  analogWrite(MOTOR_PIN4, speed); // 
 }
+
+// 5 12 gabisa PWM
 
 void loop() {
 }
