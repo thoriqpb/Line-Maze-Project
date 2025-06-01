@@ -1,4 +1,4 @@
-// mode kanan
+// mode kanan black battery
 #define MOTOR_PIN1 6    // Motor A IN1 (Right)
 #define MOTOR_PIN2 5    // Motor A IN2 (Right)
 #define MOTOR_PIN3 10   // Motor B IN1 (Left)
@@ -62,16 +62,16 @@ void loop() {
                            sensorValues[5] < threshold);
 
   // Detect turn conditions
-  if (sensorValues[0] < 380 || sensorValues[1] < 380) {
+  if (sensorValues[0] < 400 || sensorValues[1] < 400) {
     isRightTurn = true;
   }
-  if (sensorValues[6] < 380 || sensorValues[7] < 380) {
+  if (sensorValues[6] < 400 || sensorValues[7] < 400) {
     isLeftTurn = true;
   }
   
   // Detect 4-way intersection
-  if ((sensorValues[0] < 380 || sensorValues[1] < 380) && 
-      (sensorValues[6] < 380 || sensorValues[7] < 380)) {
+  if ((sensorValues[0] < 400 || sensorValues[1] < 400) && 
+      (sensorValues[6] < 400 || sensorValues[7] < 400)) {
     isIntersection = true;
   }
 
@@ -83,7 +83,7 @@ void loop() {
 
   if (frontSensorsDetectLine) {
     stopMotors();
-    Serial.println("stop");
+    Serial.print("stop");
   }
   else if (!anySensorDetectsLine) {
     // No line detected - rotate right (clockwise) to find it
@@ -130,7 +130,7 @@ void loop() {
     setMotor(MOTOR_PIN1, MOTOR_PIN2, BACKWARD, TURN_SPEED); // Right backward
     setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, TURN_SPEED-10); // Left forward
     Serial.print("Right turn\t");
-    delay(160);
+    delay(80);
     integral = 0;
   }
   else if (isLeftTurn) {
@@ -138,7 +138,7 @@ void loop() {
     setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, TURN_SPEED-10); // Right forward
     setMotor(MOTOR_PIN3, MOTOR_PIN4, BACKWARD, TURN_SPEED);   // Left backward
     Serial.print("Left turn\t");
-    delay(160);
+    delay(80);
     integral = 0;
   } 
   else {
