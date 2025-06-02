@@ -9,10 +9,10 @@
 const int selectPins[] = {2, 3, 4}; 
 const int analogPin = A0;           
 const int threshold = 230;          
-const int SPEED_BASE = 50;         
-const int TURN_SPEED = 80;        // Speed for sharp turns
-const int INTERSECTION_DELAY = 170; // Delay at intersections
-const int SEARCH_SPEED = 70;       // Speed for line searching
+const int SPEED_BASE = 40;         
+const int TURN_SPEED = 70;        // Speed for sharp turns
+const int INTERSECTION_DELAY = 100; // Delay at intersections
+const int SEARCH_SPEED = 40;       // Speed for line searching
 const unsigned long SEARCH_TIMEOUT = 2000; // Max search time (ms)
 
 // PID constants
@@ -37,7 +37,7 @@ void loop() {
   bool anySensorDetectsLine = false, frontSensorsDetectLine = false;
   bool isRightTurn = false, isLeftTurn = false, isIntersection = false;
 
-  float weights[8] = {-3, -2, -1.5, -0.5, 0.5, 1.5, 2, 3};  
+  float weights[8] = {-3, -2, -1.2, -0.5, 0.5, 1.5, 2, 3};  
 
   // Read all sensors
   for (int i = 0; i < 8; i++) {
@@ -62,16 +62,16 @@ void loop() {
                            sensorValues[5] < threshold);
 
   // Detect turn conditions
-  if (sensorValues[0] < 400 || sensorValues[1] < 400) {
+  if (sensorValues[0] < 390 || sensorValues[1] < 390) {
     isRightTurn = true;
   }
-  if (sensorValues[6] < 400 || sensorValues[7] < 400) {
+  if (sensorValues[6] < threshold || sensorValues[7] < 390) {
     isLeftTurn = true;
   }
   
   // Detect 4-way intersection
-  if ((sensorValues[0] < 400 || sensorValues[1] < 400) && 
-      (sensorValues[6] < 400 || sensorValues[7] < 400)) {
+  if ((sensorValues[0] < 390 || sensorValues[1] < 390) && 
+      (sensorValues[6] < 390 || sensorValues[7] < 390)) {
     isIntersection = true;
   }
 
@@ -120,7 +120,7 @@ void loop() {
   else if (isIntersection) {
     // At intersection, always prefer right turn
     setMotor(MOTOR_PIN1, MOTOR_PIN2, BACKWARD, TURN_SPEED); // Right backward
-    setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, TURN_SPEED);  // Left forward
+    setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, TURN_SPEED-10);  // Left forward
     Serial.print("Intersection - Right turn\t");
     delay(INTERSECTION_DELAY);
     integral = 0;
@@ -130,7 +130,7 @@ void loop() {
     setMotor(MOTOR_PIN1, MOTOR_PIN2, BACKWARD, TURN_SPEED); // Right backward
     setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, TURN_SPEED-10); // Left forward
     Serial.print("Right turn\t");
-    delay(80);
+    delay(50);
     integral = 0;
   }
   else if (isLeftTurn) {
@@ -138,7 +138,7 @@ void loop() {
     setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, TURN_SPEED-10); // Right forward
     setMotor(MOTOR_PIN3, MOTOR_PIN4, BACKWARD, TURN_SPEED);   // Left backward
     Serial.print("Left turn\t");
-    delay(80);
+    delay(50);
     integral = 0;
   } 
   else {
