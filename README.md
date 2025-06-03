@@ -1,6 +1,6 @@
-# 🕹️ Line Mesh Robot
+# 🕹️ Line Maze Robot
 
-The **Line Mesh Robot** is an intelligent line-following robot designed to navigate and determine the fastest path through a black-and-white arena. Built using three custom PCBs, this robot is an exciting blend of sensor systems, motor control, and interactive user interface.
+The **Line Maze Robot** is an intelligent line-following robot designed to navigate and determine the fastest path through a black-and-white arena. Built using three custom PCBs, this robot is an exciting blend of sensor systems, motor control, and interactive user interface.
 
 ## 🚀 Project Goal
 
@@ -93,7 +93,7 @@ Enable the robot to:
 
 ## 🙌 Credits
 
-Archived in [thoriqpb](https://github.com/thoriqpb). Special thanks to mentors and collaborators who supported the development of this line mesh robot project.
+Archived in [thoriqpb](https://github.com/thoriqpb). Special thanks to mentors and collaborators who supported the development of this line maze robot project.
 
 **Team Members:**
 - Thoriq Putra Belligan  
