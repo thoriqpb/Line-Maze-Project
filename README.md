@@ -1,5 +1,7 @@
 # 🕹️ Line Maze Robot
 
+![Demo of the Car in Action](image/demoLineMaze.gif)
+
 The **Line Maze Robot** is an intelligent line-following robot designed to navigate and determine the fastest path through a black-and-white arena. Built using three custom PCBs, this robot is an exciting blend of sensor systems, motor control, and interactive user interface.
 
 ## 🚀 Project Goal
