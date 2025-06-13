@@ -41,7 +41,7 @@ String pathHistory = "";
 int currentLeftPWM = 0;
 int currentRightPWM = 0;
 
-bool preferRight = 1; // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< TRUE = MODE KANAN >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+bool preferRight = 0; // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< TRUE = MODE KANAN >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 void setup() {
   Serial.begin(9600);
@@ -247,7 +247,7 @@ void loop() {
 
     int adjustment = output * scaler;
     int leftSpeed = constrain(SPEED_BASE + adjustment, 0, 255);
-    int rightSpeed = constrain(SPEED_BASE - adjustment, 0, 255);
+    int rightSpeed = constrain(SPEED_BASE - adjustment + 15, 0, 255);
 
     setMotorSpeeds(leftSpeed, rightSpeed);
     currentLeftPWM = leftSpeed;
