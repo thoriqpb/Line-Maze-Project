@@ -7,35 +7,35 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 // Motor control
-#define MOTOR_PIN1 6    
-#define MOTOR_PIN2 5    
-#define MOTOR_PIN3 10   
+#define MOTOR_PIN1 6
+#define MOTOR_PIN2 5
+#define MOTOR_PIN3 10
 #define MOTOR_PIN4 11
 #define FORWARD 1
 #define BACKWARD 0
 
 // Sensor and control configuration
-const int selectPins[] = {2, 3, 4}; 
-const int analogPin = A0;           
-const int threshold = 230;          
-const int SPEED_BASE = 30;         
-const int TURN_SPEED = 60;        
-const int INTERSECTION_DELAY = 80; 
-const int SEARCH_SPEED = 50;       
-const unsigned long SEARCH_TIMEOUT = 2000; 
+const int selectPins[] = { 2, 3, 4 };
+const int analogPin = A0;
+const int threshold = 230;
+const int SPEED_BASE = 30;
+const int TURN_SPEED = 60;
+const int INTERSECTION_DELAY = 80;
+const int SEARCH_SPEED = 50;
+const unsigned long SEARCH_TIMEOUT = 2000;
 
 // PID constants
-const float scaler = 17;       
-const float Kp = 1.0;               
-const float Ki = 0.0001;               
-const float Kd = 0.01;              
+const float scaler = 17;
+const float Kp = 1.0;
+const float Ki = 0.0001;
+const float Kd = 0.01;
 
-float previousError = 0;            
-float integral = 0;                 
-unsigned long lastLineTime = 0;     
-unsigned long lastMemoryTime = 0;   
+float previousError = 0;
+float integral = 0;
+unsigned long lastLineTime = 0;
+unsigned long lastMemoryTime = 0;
 unsigned long lastIntersectionTime = 0;
-const unsigned long INTERSECTION_COOLDOWN = 1000; // ms
+const unsigned long INTERSECTION_COOLDOWN = 1000;  // ms
 
 String currentDirection = "STOP";
 String currentPath = "-";
@@ -43,22 +43,25 @@ String pathHistory = "";
 int currentLeftPWM = 0;
 int currentRightPWM = 0;
 
-String fixedPath = "SULLULULLS"; // Editable path
+String fixedPath = "SULLULULLS";  // Editable path
 int fixedPathIndex = 0;
 bool pathCompleted = false;
 
-bool preferRight = 0; // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< TRUE = MODE KANAN >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+bool preferRight = 0;  // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< TRUE = MODE KANAN >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 void setup() {
   Serial.begin(9600);
-  pinMode(MOTOR_PIN1, OUTPUT); pinMode(MOTOR_PIN2, OUTPUT);
-  pinMode(MOTOR_PIN3, OUTPUT); pinMode(MOTOR_PIN4, OUTPUT);
+  pinMode(MOTOR_PIN1, OUTPUT);
+  pinMode(MOTOR_PIN2, OUTPUT);
+  pinMode(MOTOR_PIN3, OUTPUT);
+  pinMode(MOTOR_PIN4, OUTPUT);
   for (int i = 0; i < 3; i++) pinMode(selectPins[i], OUTPUT);
-  pinMode(12, INPUT_PULLUP); // Button for path simplification
+  pinMode(12, INPUT_PULLUP);  // Button for path simplification
 
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println(F("OLED failed"));
-    while (true);
+    while (true)
+      ;
   }
   display.clearDisplay();
   display.setTextSize(1);
@@ -92,7 +95,7 @@ void loop() {
   bool intersectionAll = false, intersectionSide = false;
   bool intersectionFrontLeft = false, intersectionFrontRight = false;
 
-  float weights[8] = {-3, -2, -1.2, -0.5, 0.5, 1.2, 2, 3};
+  float weights[8] = { -3, -2, -1.2, -0.5, 0.5, 1.2, 2, 3 };
 
   for (int i = 0; i < 8; i++) {
     selectChannel(i);
@@ -108,7 +111,8 @@ void loop() {
     weightedSum += sensorActive * weight;
     sum += sensorActive;
 
-    Serial.print(val); Serial.print("\t");
+    Serial.print(val);
+    Serial.print("\t");
   }
   Serial.println();
 
@@ -213,7 +217,7 @@ void loop() {
 
     int adjustment = output * scaler;
     int leftSpeed = constrain(SPEED_BASE + adjustment, 0, 255);
-    int rightSpeed = constrain(SPEED_BASE - adjustment + 15 , 0, 255);
+    int rightSpeed = constrain(SPEED_BASE - adjustment + 15, 0, 255);
 
     setMotorSpeeds(leftSpeed, rightSpeed);
     currentLeftPWM = leftSpeed;
@@ -244,8 +248,10 @@ void setMotorSpeeds(int leftSpeed, int rightSpeed) {
 
 void stopMotors() {
   delay(130);
-  analogWrite(MOTOR_PIN1, 0); analogWrite(MOTOR_PIN2, 0);
-  analogWrite(MOTOR_PIN3, 0); analogWrite(MOTOR_PIN4, 0);
+  analogWrite(MOTOR_PIN1, 0);
+  analogWrite(MOTOR_PIN2, 0);
+  analogWrite(MOTOR_PIN3, 0);
+  analogWrite(MOTOR_PIN4, 0);
   currentLeftPWM = 0;
   currentRightPWM = 0;
 }
@@ -269,10 +275,14 @@ void displayFixedPath() {
 void displayStatus() {
   display.clearDisplay();
   display.setCursor(0, 0);
-  display.print("Dir: "); display.println(currentDirection);
-  display.print("PWM L: "); display.println(currentLeftPWM);
-  display.print("PWM R: "); display.println(currentRightPWM);
-  display.print("Path: "); display.println(pathHistory);
+  display.print("Dir: ");
+  display.println(currentDirection);
+  display.print("PWM L: ");
+  display.println(currentLeftPWM);
+  display.print("PWM R: ");
+  display.println(currentRightPWM);
+  display.print("Path: ");
+  display.println(pathHistory);
   displayFixedPath();
   display.display();
 }
@@ -292,11 +302,10 @@ String simplifyPath(String path) {
       path.replace("RUR", "S");
       path.replace("RUL", "U");
     } else {
-    path.replace("SUL", "R");
-    path.replace("LUL", "S");
-    path.replace("LUR", "U");
+      path.replace("SUL", "R");
+      path.replace("LUL", "S");
+      path.replace("LUR", "U");
     }
   }
   return path;
 }
-
