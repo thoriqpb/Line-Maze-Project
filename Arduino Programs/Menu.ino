@@ -23,8 +23,8 @@ MenuState menuState = MAIN_MENU;
 const char* mainMenuItems[] = {"Line Follower Mode", "Line Maze Mode", "About"};
 const int mainMenuCount = 3;
 
-const char* mazeSubMenu[] = {"Search Path", "Play Path", "Reset Path"};
-const int mazeSubMenuCount = 3;
+const char* mazeSubMenu[] = {"Left Search Path", "Right Search Path", "Play Path", "Reset Path"};
+const int mazeSubMenuCount = 4;
 
 int selectedItem = 0;
 
@@ -137,9 +137,10 @@ void handleOK() {
 
     case MAZE_SUB_MENU:
       switch (selectedItem) {
-        case 0: searchPath(); break;
-        case 1: playPath(); break;
-        case 2: resetPath(); break;
+        case 0: leftSearchPath(); break;
+        case 1: rightSearchPath(); break;
+        case 2: playPath(); break;
+        case 3: resetPath(); break;
       }
       menuState = MAIN_MENU;
       selectedItem = 0;
@@ -222,10 +223,18 @@ void lineFollowerMode() {
   delay(1000);
 }
 
-void searchPath() {
+void leftSearchPath() {
   display.clearDisplay();
   display.setCursor(0, 0);
-  display.println("Searching path...");
+  display.println("Left Search Path...");
+  display.display();
+  delay(1000);
+}
+
+void rightSearchPath() {
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println("Right Search Path...");
   display.display();
   delay(1000);
 }
