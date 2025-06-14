@@ -17,10 +17,10 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 // Sensor and control configuration
 const int selectPins[] = { 2, 3, 4 };
 const int analogPin = A0;
-const int threshold = 230;
+const int threshold = 230; // max - 100
 const int SPEED_BASE = 30;
 const int TURN_SPEED = 60;
-const int INTERSECTION_DELAY = 80;
+const int INTERSECTION_DELAY = 100;
 const int SEARCH_SPEED = 50;
 const unsigned long SEARCH_TIMEOUT = 2000;
 
@@ -43,7 +43,7 @@ String pathHistory = "";
 int currentLeftPWM = 0;
 int currentRightPWM = 0;
 
-String fixedPath = "SULLULULLS";  // Editable path
+String fixedPath = "LRLS";  // Editable path
 int fixedPathIndex = 0;
 bool pathCompleted = false;
 
@@ -51,12 +51,9 @@ bool preferRight = 0;  // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 void setup() {
   Serial.begin(9600);
-  pinMode(MOTOR_PIN1, OUTPUT);
-  pinMode(MOTOR_PIN2, OUTPUT);
-  pinMode(MOTOR_PIN3, OUTPUT);
-  pinMode(MOTOR_PIN4, OUTPUT);
+  pinMode(MOTOR_PIN1, OUTPUT); pinMode(MOTOR_PIN2, OUTPUT);
+  pinMode(MOTOR_PIN3, OUTPUT); pinMode(MOTOR_PIN4, OUTPUT);
   for (int i = 0; i < 3; i++) pinMode(selectPins[i], OUTPUT);
-  pinMode(12, INPUT_PULLUP);  // Button for path simplification
 
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println(F("OLED failed"));
@@ -66,36 +63,18 @@ void setup() {
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0, 0);
-  display.println("OLED Ready");
-  display.display();
-  delay(1000);
 }
 
 void loop() {
-  // === Check for path simplification ===
-  if (digitalRead(12) == LOW) {
-    fixedPath = simplifyPath(fixedPath);
-    fixedPathIndex = 0;
-    pathCompleted = false;
-    pathHistory = "";
-
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println("Path Simplified!");
-    display.println(fixedPath);
-    display.display();
-    delay(1000);
-  }
-
-  // === Line Tracking and Logic ===
   int sensorValues[8], weightedSum = 0, sum = 0;
   bool anySensorDetectsLine = false, frontSensorsDetectLine = false;
   bool isRightTurn = false, isLeftTurn = false;
-  bool intersectionAll = false, intersectionSide = false;
-  bool intersectionFrontLeft = false, intersectionFrontRight = false;
+  bool intersectionAll = false;
+  bool intersectionSide = false;
+  bool intersectionFrontLeft = false;
+  bool intersectionFrontRight = false;
 
-  float weights[8] = { -3, -2, -1.2, -0.5, 0.5, 1.2, 2, 3 };
+  float weights[8] = {-3, -2, -1.2, -0.5, 0.5, 1.2, 2, 3};  
 
   for (int i = 0; i < 8; i++) {
     selectChannel(i);
@@ -116,9 +95,9 @@ void loop() {
   }
   Serial.println();
 
-  frontSensorsDetectLine = (sensorValues[3] < 250 || sensorValues[4] < 250);
-  bool leftSide = (sensorValues[6] < 380 || sensorValues[7] < 380);
-  bool rightSide = (sensorValues[0] < 280 || sensorValues[1] < 280);
+  frontSensorsDetectLine = (sensorValues[3] < 150 || sensorValues[4] < 200);
+  bool leftSide = (sensorValues[6] < 450 || sensorValues[7] < 320);
+  bool rightSide = (sensorValues[0] < 400 || sensorValues[1] < 250);
   bool leftFront = frontSensorsDetectLine && leftSide;
   bool rightFront = frontSensorsDetectLine && rightSide;
 
@@ -138,15 +117,15 @@ void loop() {
   }
 
   if (isLeftTurn || isRightTurn || intersectionSide || intersectionFrontLeft || intersectionFrontRight) {
-    delay(110);
+    delay(50);
     for (int i = 0; i < 8; i++) {
       selectChannel(i);
       sensorValues[i] = analogRead(analogPin);
     }
 
-    frontSensorsDetectLine = (sensorValues[3] < 220 || sensorValues[4] < 220);
-    leftSide = (sensorValues[6] < 380 || sensorValues[7] < 380);
-    rightSide = (sensorValues[0] < 280 || sensorValues[1] < 280);
+    frontSensorsDetectLine = (sensorValues[3] < 150 || sensorValues[4] < 200);
+    leftSide = (sensorValues[6] < 450 || sensorValues[7] < 320);
+    rightSide = (sensorValues[0] < 400 || sensorValues[1] < 250);
     leftFront = frontSensorsDetectLine && leftSide;
     rightFront = frontSensorsDetectLine && rightSide;
 
@@ -157,7 +136,7 @@ void loop() {
     isRightTurn = rightSide && !frontSensorsDetectLine;
   }
 
-  if ((sensorValues[2] < 380 && sensorValues[3] < 380) && (sensorValues[4] < 380 && sensorValues[5] < 380)) {
+  if ((sensorValues[2] < 350 && sensorValues[3] < 150) && (sensorValues[4] < 150 && sensorValues[5] < 350)) {
     stopMotors();
     currentDirection = "STOP";
     currentPath = "-";
@@ -165,7 +144,7 @@ void loop() {
 
   else if (isRightTurn) {
     setMotor(MOTOR_PIN1, MOTOR_PIN2, BACKWARD, TURN_SPEED);
-    setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, TURN_SPEED);
+    setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, TURN_SPEED + 15);
     currentDirection = "RIGHT";
     delay(50);
     integral = 0;
@@ -173,7 +152,7 @@ void loop() {
 
   else if (isLeftTurn) {
     setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, TURN_SPEED);
-    setMotor(MOTOR_PIN3, MOTOR_PIN4, BACKWARD, TURN_SPEED);
+    setMotor(MOTOR_PIN3, MOTOR_PIN4, BACKWARD, TURN_SPEED + 15);
     currentDirection = "LEFT";
     delay(50);
     integral = 0;
@@ -190,15 +169,15 @@ void loop() {
     switch (dir) {
       case 'R':
         setMotor(MOTOR_PIN1, MOTOR_PIN2, BACKWARD, TURN_SPEED);
-        setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, TURN_SPEED - 10);
+        setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, TURN_SPEED - 10 + 15);
         break;
       case 'L':
-        setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, TURN_SPEED - 10);
+        setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, TURN_SPEED - 10 + 15);
         setMotor(MOTOR_PIN3, MOTOR_PIN4, BACKWARD, TURN_SPEED);
         break;
       case 'S':
         setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, SPEED_BASE);
-        setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, SPEED_BASE);
+        setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, SPEED_BASE + 15);
         break;
     }
 
@@ -277,10 +256,6 @@ void displayStatus() {
   display.setCursor(0, 0);
   display.print("Dir: ");
   display.println(currentDirection);
-  display.print("PWM L: ");
-  display.println(currentLeftPWM);
-  display.print("PWM R: ");
-  display.println(currentRightPWM);
   display.print("Path: ");
   display.println(pathHistory);
   displayFixedPath();
@@ -289,7 +264,7 @@ void displayStatus() {
 
 void appendToPath(String pathChar) {
   unsigned long currentMillis = millis();
-  if (currentMillis - lastMemoryTime >= 800 && pathHistory.length() < 20) {
+  if (currentMillis - lastMemoryTime >= 1000 && pathHistory.length() < 20) {
     pathHistory += pathChar;
     lastMemoryTime = currentMillis;
   }
