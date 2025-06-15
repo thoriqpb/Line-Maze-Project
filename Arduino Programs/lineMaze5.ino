@@ -60,6 +60,7 @@ void setup() {
   for (int i = 0; i < 3; i++) pinMode(selectPins[i], OUTPUT);
 
   pinMode(12, INPUT_PULLUP);  // Button for path simplification
+  pinMode(16, INPUT_PULLUP);  // Button for path simplification
   pinMode(BUZZER_PIN, OUTPUT);  // <<< Add this line
 
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
@@ -90,6 +91,20 @@ void loop() {
     display.display();
     delay(1000);
   }
+  
+  // if (digitalRead(16) == LOW) {
+  //   preferRight = !preferRight;
+  //   display.clearDisplay();
+  //   display.setCursor(0, 0);
+  //   if (preferRight) {
+  //     display.print("Right ");
+  //   } else {
+  //     display.print("Left ");
+  //   }
+  //   display.println("Search Mode");
+  //   display.display();
+  //   delay(1000);
+  // }
 
   int sensorValues[8], weightedSum = 0, sum = 0;
   bool anySensorDetectsLine = false, frontSensorsDetectLine = false;
@@ -120,9 +135,9 @@ void loop() {
   }
   Serial.println();
 
-  frontSensorsDetectLine = (sensorValues[3] < 150 || sensorValues[4] < 200);
-  bool leftSide = (sensorValues[6] < 450 || sensorValues[7] < 320);
-  bool rightSide = (sensorValues[0] < 400 || sensorValues[1] < 250);
+  bool rightSide = (sensorValues[0] < 320 || sensorValues[1] < 250);
+  frontSensorsDetectLine = (sensorValues[3] < 150 || sensorValues[4] < 150);
+  bool leftSide = (sensorValues[6] < 320 || sensorValues[7] < 250);
   bool leftFront = frontSensorsDetectLine && leftSide;
   bool rightFront = frontSensorsDetectLine && rightSide;
 
@@ -143,7 +158,7 @@ void loop() {
 
   // === Confirm side detection with delay ===
   if (isLeftTurn || isRightTurn || intersectionSide || intersectionFrontLeft || intersectionFrontRight) {
-    delay(110);  // Confirm before acting
+    delay(100);  // Confirm before acting
 
     // Re-read sensors
     for (int i = 0; i < 8; i++) {
@@ -152,9 +167,9 @@ void loop() {
     }
 
     // Recalculate detection flags
-    frontSensorsDetectLine = (sensorValues[3] < 150 || sensorValues[4] < 200);
-    leftSide = (sensorValues[6] < 450 || sensorValues[7] < 320);
-    rightSide = (sensorValues[0] < 400 || sensorValues[1] < 250);
+    leftSide = (sensorValues[6] < 320 || sensorValues[7] < 250);
+    frontSensorsDetectLine = (sensorValues[3] < 150 || sensorValues[4] < 150);
+    rightSide = (sensorValues[0] < 320 || sensorValues[1] < 250);
     leftFront = frontSensorsDetectLine && leftSide;
     rightFront = frontSensorsDetectLine && rightSide;
 
@@ -340,7 +355,7 @@ void displayStatus() {
 
 void appendToPath(String pathChar) {
   unsigned long currentMillis = millis();
-  if (currentMillis - lastMemoryTime >= 1500 && pathHistory.length() < 20) {
+  if (currentMillis - lastMemoryTime >= 800 && pathHistory.length() < 20) {
     pathHistory += pathChar;
     lastMemoryTime = currentMillis;
   }
