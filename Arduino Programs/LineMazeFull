@@ -7,24 +7,34 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 // Motor control
-#define MOTOR_PIN1 6    
-#define MOTOR_PIN2 5    
-#define MOTOR_PIN3 10   
-#define MOTOR_PIN4 11  
+#define MOTOR_PIN1 5    
+#define MOTOR_PIN2 6    
+#define MOTOR_PIN3 11   
+#define MOTOR_PIN4 10  
 
 #define BUZZER_PIN 8
 
 #define FORWARD 1
 #define BACKWARD 0
 
+// === Thresholds for individual sensors ===
+int thresholdRight0 = 550;
+int thresholdRight1 = 380;
+
+int thresholdFront3 = 150;
+int thresholdFront4 = 150;
+
+int thresholdLeft6 = 520;
+int thresholdLeft7 = 400;
+
 // Sensor and control configuration
 const int selectPins[] = {2, 3, 4}; 
 const int analogPin = A0;           
-const int threshold = 230;          
+const int threshold = 300;          
 const int SPEED_BASE = 30;         
-const int TURN_SPEED = 55;          
-const int INTERSECTION_DELAY = 80; 
-const int SEARCH_SPEED = 45;       
+const int TURN_SPEED = 45;          
+const int INTERSECTION_DELAY = 100; 
+const int SEARCH_SPEED = 35;       
 const unsigned long SEARCH_TIMEOUT = 2000; 
 
 // PID constants
@@ -42,15 +52,15 @@ const unsigned long INTERSECTION_COOLDOWN = 1000;  // ms
 
 String currentDirection = "STOP";
 String currentPath = "-";
-String pathHistory = "";
-int currentLeftPWM = 0;
-int currentRightPWM = 0;
+String pathHistory = "RURRUSURRSURRUR";
+// int currentLeftPWM = 0;
+// int currentRightPWM = 0;
 
 // String fixedPath = "";  // Editable path
 int fixedPathIndex = 0;
 bool pathCompleted = false;
 
-bool preferRight = 0; // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< TRUE = MODE KANAN >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+bool preferRight = 1; // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< TRUE = MODE KANAN >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 enum Mode { IDLE, SEARCH, PLAY };
 Mode currentMode = IDLE;
@@ -78,11 +88,6 @@ void setup() {
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0, 0);
-  display.println("Line Maze Ready");
-  display.display();
-  
-  delay(1000);
 }
 
 void loop() {
@@ -108,16 +113,14 @@ void loop() {
 }
 
 String simplifyPath(String path) {
-  for (int i = 0; i < 10; i++) {
-    if (preferRight) {
-      path.replace("SUR", "L");
-      path.replace("RUR", "S");
-      path.replace("RUL", "U");
-    } else {
-      path.replace("SUL", "R");
-      path.replace("LUL", "S");
-      path.replace("LUR", "U");
-    }
+  if (preferRight) {
+    path.replace("SUR", "L");
+    path.replace("RUR", "S");
+    path.replace("RUL", "U");
+  } else {
+    path.replace("SUL", "R");
+    path.replace("LUL", "S");
+    path.replace("LUR", "U");
   }
   return path;
 }
@@ -152,11 +155,12 @@ void searchMode() {
   }
   Serial.println();
 
-  bool rightSide = (sensorValues[0] < 280 || sensorValues[1] < 270);
-  frontSensorsDetectLine = (sensorValues[3] < 150 || sensorValues[4] < 150);
-  bool leftSide = (sensorValues[6] < 250 || sensorValues[7] < 250);
+  bool rightSide = (sensorValues[0] < thresholdRight0 || sensorValues[1] < thresholdRight1);
+  frontSensorsDetectLine = (sensorValues[3] < thresholdFront3 || sensorValues[4] < thresholdFront4);
+  bool leftSide = (sensorValues[6] < thresholdLeft6 || sensorValues[7] < thresholdLeft7);
   bool leftFront = frontSensorsDetectLine && leftSide;
   bool rightFront = frontSensorsDetectLine && rightSide;
+
 
   intersectionAll = frontSensorsDetectLine && leftSide && rightSide;
   intersectionSide = leftSide && rightSide;
@@ -165,17 +169,9 @@ void searchMode() {
   isLeftTurn = leftSide && !frontSensorsDetectLine;
   isRightTurn = rightSide && !frontSensorsDetectLine;
 
-  bool allSensorsBelow100 = true;
-  for (int i = 0; i < 8; i++) {
-    if (sensorValues[i] >= 200) {
-      allSensorsBelow100 = false;
-      break;
-    }
-  }
-
   // === Confirm side detection with delay ===
   if (isLeftTurn || isRightTurn || intersectionSide || intersectionFrontLeft || intersectionFrontRight) {
-    delay(90);  // Confirm before acting
+    delay(80);  // Confirm before acting
 
     // Re-read sensors
     for (int i = 0; i < 8; i++) {
@@ -184,9 +180,9 @@ void searchMode() {
     }
 
     // Recalculate detection flags
-    leftSide = (sensorValues[6] < 380 || sensorValues[7] < 270);
-    frontSensorsDetectLine = (sensorValues[3] < 150 || sensorValues[4] < 150);
-    rightSide = (sensorValues[0] < 250 || sensorValues[1] < 250);
+    leftSide = (sensorValues[6] < thresholdLeft6 || sensorValues[7] < thresholdLeft7);
+    frontSensorsDetectLine = (sensorValues[3] < thresholdFront3 || sensorValues[4] < thresholdFront4);
+    rightSide = (sensorValues[0] < thresholdRight0 || sensorValues[1] < thresholdRight1);
     leftFront = frontSensorsDetectLine && leftSide;
     rightFront = frontSensorsDetectLine && rightSide;
 
@@ -203,7 +199,7 @@ void searchMode() {
     currentPath = "-";
   }
   else if (!anySensorDetectsLine) {
-    delay(20);
+    // delay(20);
     unsigned long searchStart = millis();
     currentDirection = "SEARCH";
     currentPath = "U";  
@@ -212,13 +208,13 @@ void searchMode() {
       if (preferRight) {
         setMotor(MOTOR_PIN1, MOTOR_PIN2, BACKWARD, SEARCH_SPEED);
         setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, SEARCH_SPEED);
-        currentLeftPWM = SEARCH_SPEED;
-        currentRightPWM = SEARCH_SPEED;
+        // currentLeftPWM = SEARCH_SPEED;
+        // currentRightPWM = SEARCH_SPEED;
       } else if (!preferRight) {
         setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, SEARCH_SPEED);
         setMotor(MOTOR_PIN3, MOTOR_PIN4, BACKWARD, SEARCH_SPEED);
-        currentLeftPWM = SEARCH_SPEED;
-        currentRightPWM = SEARCH_SPEED;
+        // currentLeftPWM = SEARCH_SPEED;
+        // currentRightPWM = SEARCH_SPEED;
       }
 
       bool foundLine = false;
@@ -293,7 +289,7 @@ void searchMode() {
     setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, TURN_SPEED + 15);
     currentDirection = "RIGHT";
     // NO appendToPath here!
-    delay(50);
+    delay(30);
     integral = 0;
   }
   else if (isLeftTurn) {
@@ -302,7 +298,7 @@ void searchMode() {
     setMotor(MOTOR_PIN3, MOTOR_PIN4, BACKWARD, TURN_SPEED + 15);
     currentDirection = "LEFT";
     // NO appendToPath here!
-    delay(50);
+    delay(30);
     integral = 0;
   }
 
@@ -319,8 +315,8 @@ void searchMode() {
     int rightSpeed = constrain(SPEED_BASE - adjustment + 15, 0, 255);
 
     setMotorSpeeds(leftSpeed, rightSpeed);
-    currentLeftPWM = leftSpeed;
-    currentRightPWM = rightSpeed;
+    // currentLeftPWM = leftSpeed;
+    // currentRightPWM = rightSpeed;
     currentDirection = "FORWARD";
     currentPath = "-";
   }
@@ -348,9 +344,9 @@ void stopMotors() {
   analogWrite(MOTOR_PIN2, 0);
   analogWrite(MOTOR_PIN3, 0);
   analogWrite(MOTOR_PIN4, 0);
-  currentLeftPWM = 0;
-  currentRightPWM = 0;
-  // Beep();
+  // currentLeftPWM = 0;
+  // currentRightPWM = 0;
+  Beep();
 }
 
 void selectChannel(int channel) {
@@ -361,13 +357,13 @@ void displayStatus() {
   display.clearDisplay();
   display.setCursor(0, 0);
   display.print("Mode: ");
-  display.println(currentDirection);
+  display.println(preferRight);
   display.print("Dir: "); 
   display.println(currentDirection);
-  display.print("PWM L: "); 
-  display.println(currentLeftPWM);
-  display.print("PWM R: "); 
-  display.println(currentRightPWM);
+  // display.print("PWM L: "); 
+  // display.println(currentLeftPWM);
+  // display.print("PWM R: "); 
+  // display.println(currentRightPWM);
   display.print("Path: "); 
   display.println(pathHistory);
   display.display();
@@ -375,7 +371,7 @@ void displayStatus() {
 
 void appendToPath(String pathChar) {
   unsigned long currentMillis = millis();
-  if (currentMillis - lastMemoryTime >= 800 && pathHistory.length() < 20) {
+  if (currentMillis - lastMemoryTime >= 1000 && pathHistory.length() < 16) {
     pathHistory += pathChar;
     lastMemoryTime = currentMillis;
   }
@@ -418,11 +414,12 @@ void playMode() {
     sum += sensorActive;
   }
 
-  bool rightSide = (sensorValues[0] < 320 || sensorValues[1] < 250);
-  frontSensorsDetectLine = (sensorValues[3] < 150 || sensorValues[4] < 150);
-  bool leftSide = (sensorValues[6] < 320 || sensorValues[7] < 250);
-  bool leftFront = frontSensorsDetectLine && leftSide;
-  bool rightFront = frontSensorsDetectLine && rightSide;
+    bool rightSide = (sensorValues[0] < thresholdRight0 || sensorValues[1] < thresholdRight1);
+    frontSensorsDetectLine = (sensorValues[3] < thresholdFront3 || sensorValues[4] < thresholdFront4);
+    bool leftSide = (sensorValues[6] < thresholdLeft6 || sensorValues[7] < thresholdLeft7);
+    bool leftFront = frontSensorsDetectLine && leftSide;
+    bool rightFront = frontSensorsDetectLine && rightSide;
+
 
   intersectionAll = frontSensorsDetectLine && leftSide && rightSide;
   intersectionSide = leftSide && rightSide;
@@ -432,17 +429,18 @@ void playMode() {
   isRightTurn = rightSide && !frontSensorsDetectLine;
 
   if (isLeftTurn || isRightTurn || intersectionSide || intersectionFrontLeft || intersectionFrontRight) {
-    delay(90);
+    delay(100);
     for (int i = 0; i < 8; i++) {
       selectChannel(i);
       sensorValues[i] = analogRead(analogPin);
     }
 
-    leftSide = (sensorValues[6] < 320 || sensorValues[7] < 250);
-    frontSensorsDetectLine = (sensorValues[3] < 150 || sensorValues[4] < 150);
-    rightSide = (sensorValues[0] < 320 || sensorValues[1] < 250);
+    leftSide = (sensorValues[6] < thresholdLeft6 || sensorValues[7] < thresholdLeft7);
+    frontSensorsDetectLine = (sensorValues[3] < thresholdFront3 || sensorValues[4] < thresholdFront4);
+    rightSide = (sensorValues[0] < thresholdRight0 || sensorValues[1] < thresholdRight1);
     leftFront = frontSensorsDetectLine && leftSide;
     rightFront = frontSensorsDetectLine && rightSide;
+
 
     intersectionSide = leftSide && rightSide;
     intersectionFrontLeft = leftFront;
@@ -461,7 +459,7 @@ void playMode() {
     setMotor(MOTOR_PIN1, MOTOR_PIN2, BACKWARD, TURN_SPEED);
     setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, TURN_SPEED + 15);
     currentDirection = "RIGHT";
-    delay(50);
+    delay(40);
     integral = 0;
   }
 
@@ -469,7 +467,7 @@ void playMode() {
     setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, TURN_SPEED);
     setMotor(MOTOR_PIN3, MOTOR_PIN4, BACKWARD, TURN_SPEED + 15);
     currentDirection = "LEFT";
-    delay(50);
+    delay(40);
     integral = 0;
   }
 
@@ -514,8 +512,8 @@ void playMode() {
     int rightSpeed = constrain(SPEED_BASE - adjustment + 15, 0, 255);
 
     setMotorSpeeds(leftSpeed, rightSpeed);
-    currentLeftPWM = leftSpeed;
-    currentRightPWM = rightSpeed;
+    // currentLeftPWM = leftSpeed;
+    // currentRightPWM = rightSpeed;
     currentDirection = "FORWARD";
     currentPath = "-";
   }
