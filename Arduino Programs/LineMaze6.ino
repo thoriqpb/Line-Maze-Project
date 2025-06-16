@@ -6,98 +6,131 @@
 #define SCREEN_HEIGHT 64
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
-#define MOTOR_PIN1 6
-#define MOTOR_PIN2 5
-#define MOTOR_PIN3 10
-#define MOTOR_PIN4 11
+// Motor control
+#define MOTOR_PIN1 5    
+#define MOTOR_PIN2 6    
+#define MOTOR_PIN3 11   
+#define MOTOR_PIN4 10  
+
+#define BUZZER_PIN 8
+
 #define FORWARD 1
 #define BACKWARD 0
 
-#define BUTTON_SEARCH 12
-#define BUTTON_PLAY 16
+// === Thresholds for individual sensors ===
+int thresholdRight0 = 550;
+int thresholdRight1 = 380;
 
-const int selectPins[] = { 2, 3, 4 };
-const int analogPin = A0;
-const int threshold = 230;
-const int SPEED_BASE = 30;
-const int TURN_SPEED = 60;
-const int INTERSECTION_DELAY = 80;
-const int SEARCH_SPEED = 50;
-const unsigned long SEARCH_TIMEOUT = 2000;
+int thresholdFront3 = 150;
+int thresholdFront4 = 150;
 
-const float scaler = 17;
-const float Kp = 1.0;
-const float Ki = 0.0001;
-const float Kd = 0.01;
+int thresholdLeft6 = 520;
+int thresholdLeft7 = 400;
+
+// Sensor and control configuration
+const int selectPins[] = {2, 3, 4}; 
+const int analogPin = A0;           
+const int threshold = 300;          
+const int SPEED_BASE = 30;         
+const int TURN_SPEED = 45;          
+const int INTERSECTION_DELAY = 100; 
+const int SEARCH_SPEED = 35;       
+const unsigned long SEARCH_TIMEOUT = 2000; 
+
+// PID constants
+const float scaler = 17;       
+const float Kp = 1.0;               
+const float Ki = 0.0001;               
+const float Kd = 0.01;              
 
 float previousError = 0;
 float integral = 0;
 unsigned long lastLineTime = 0;
 unsigned long lastMemoryTime = 0;
 unsigned long lastIntersectionTime = 0;
-const unsigned long INTERSECTION_COOLDOWN = 1000;  // ms
+const unsigned long INTERSECTION_COOLDOWN = 1000;  // ms 
 
 String currentDirection = "STOP";
 String currentPath = "-";
-String pathHistory = ""; // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< MEMORY >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+String pathHistory = "";
 int currentLeftPWM = 0;
 int currentRightPWM = 0;
 
-bool playMode = false;
+// String fixedPath = "";  // Editable path
 int fixedPathIndex = 0;
 bool pathCompleted = false;
 
-bool preferRight = 0;  // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< TRUE = MODE KANAN >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+bool preferRight = 1; // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< TRUE = MODE KANAN >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+enum Mode { IDLE, SEARCH, PLAY };
+Mode currentMode = IDLE;
+
+bool isRunning = false;
 
 void setup() {
   Serial.begin(9600);
-
+ 
   pinMode(MOTOR_PIN1, OUTPUT); pinMode(MOTOR_PIN2, OUTPUT);
   pinMode(MOTOR_PIN3, OUTPUT); pinMode(MOTOR_PIN4, OUTPUT);
-
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-
-  // Pin setup
-  pinMode(BUTTON_SEARCH, INPUT_PULLUP);
-  pinMode(BUTTON_PLAY, INPUT_PULLUP);
   for (int i = 0; i < 3; i++) pinMode(selectPins[i], OUTPUT);
+
+  pinMode(12, INPUT_PULLUP); // Start/Stop
+  pinMode(16, INPUT_PULLUP); // Simplify
+  pinMode(17, INPUT_PULLUP); // Search
+  pinMode(9, INPUT_PULLUP);  // Play
+  pinMode(BUZZER_PIN, OUTPUT);  // <<< Add this line
+
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println(F("OLED failed"));
+    while (true);
+  }
 
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
   display.setCursor(0, 0);
-  display.println("Line Maze Robot");
+  display.println("Line Maze Ready");
   display.display();
+  
   delay(1000);
 }
 
 void loop() {
-  if (digitalRead(BUTTON_SEARCH) == LOW) {
-    playMode = false;
-    pathHistory = "";
-    pathCompleted = false;
-    display.clearDisplay();
-    display.setCursor(0, 0);
-    display.println("MODE: SEARCH");
-    display.display();
-    delay(500);
-  }
-
-  if (digitalRead(BUTTON_PLAY) == LOW) {
-    playMode = true;
+  if (digitalRead(12) == LOW) {
     pathHistory = simplifyPath(pathHistory);
     fixedPathIndex = 0;
     pathCompleted = false;
 
     display.clearDisplay();
     display.setCursor(0, 0);
-    display.println("MODE: PLAY");
     display.println("Path Simplified!");
     display.println(pathHistory);
     display.display();
-    delay(500);
+    delay(1000);
   }
+  if (digitalRead(16) == LOW) currentMode = IDLE;
+  if (digitalRead(17) == LOW) currentMode = SEARCH;
+  if (digitalRead(9) == LOW) currentMode = PLAY;
 
+  if (currentMode == SEARCH) searchMode();
+  else if (currentMode == PLAY) playMode();
+  displayStatus();
+}
+
+String simplifyPath(String path) {
+  if (preferRight) {
+    path.replace("SUR", "L");
+    path.replace("RUR", "S");
+    path.replace("RUL", "U");
+  } else {
+    path.replace("SUL", "R");
+    path.replace("LUL", "S");
+    path.replace("LUR", "U");
+  }
+  return path;
+}
+
+void searchMode() {
   int sensorValues[8], weightedSum = 0, sum = 0;
   bool anySensorDetectsLine = false, frontSensorsDetectLine = false;
   bool isRightTurn = false, isLeftTurn = false;
@@ -127,11 +160,12 @@ void loop() {
   }
   Serial.println();
 
-  frontSensorsDetectLine = (sensorValues[3] < 250 || sensorValues[4] < 250);
-  bool leftSide = (sensorValues[6] < 380 || sensorValues[7] < 380);
-  bool rightSide = (sensorValues[0] < 280 || sensorValues[1] < 280);
+  bool rightSide = (sensorValues[0] < thresholdRight0 || sensorValues[1] < thresholdRight1);
+  frontSensorsDetectLine = (sensorValues[3] < thresholdFront3 || sensorValues[4] < thresholdFront4);
+  bool leftSide = (sensorValues[6] < thresholdLeft6 || sensorValues[7] < thresholdLeft7);
   bool leftFront = frontSensorsDetectLine && leftSide;
   bool rightFront = frontSensorsDetectLine && rightSide;
+
 
   intersectionAll = frontSensorsDetectLine && leftSide && rightSide;
   intersectionSide = leftSide && rightSide;
@@ -140,16 +174,20 @@ void loop() {
   isLeftTurn = leftSide && !frontSensorsDetectLine;
   isRightTurn = rightSide && !frontSensorsDetectLine;
 
+  // === Confirm side detection with delay ===
   if (isLeftTurn || isRightTurn || intersectionSide || intersectionFrontLeft || intersectionFrontRight) {
-    delay(110);
+    delay(80);  // Confirm before acting
+
+    // Re-read sensors
     for (int i = 0; i < 8; i++) {
       selectChannel(i);
       sensorValues[i] = analogRead(analogPin);
     }
 
-    frontSensorsDetectLine = (sensorValues[3] < 220 || sensorValues[4] < 220);
-    leftSide = (sensorValues[6] < 380 || sensorValues[7] < 380);
-    rightSide = (sensorValues[0] < 280 || sensorValues[1] < 280);
+    // Recalculate detection flags
+    leftSide = (sensorValues[6] < thresholdLeft6 || sensorValues[7] < thresholdLeft7);
+    frontSensorsDetectLine = (sensorValues[3] < thresholdFront3 || sensorValues[4] < thresholdFront4);
+    rightSide = (sensorValues[0] < thresholdRight0 || sensorValues[1] < thresholdRight1);
     leftFront = frontSensorsDetectLine && leftSide;
     rightFront = frontSensorsDetectLine && rightSide;
 
@@ -160,219 +198,134 @@ void loop() {
     isRightTurn = rightSide && !frontSensorsDetectLine;
   }
 
-  // ==== PLAY MODE ====
-  if (playMode) {
-    // ======= PLAY MODE CONTROL =======
-    if ((intersectionSide || intersectionFrontLeft || intersectionFrontRight) &&
-        !pathCompleted && millis() - lastIntersectionTime > INTERSECTION_COOLDOWN) {
+  if ((sensorValues[2] < 350 && sensorValues[3] < 150) && (sensorValues[4] < 150 && sensorValues[5] < 350)) {
+    stopMotors();
+    currentDirection = "STOP";
+    currentPath = "-";
+  }
+  else if (!anySensorDetectsLine) {
+    // delay(20);
+    unsigned long searchStart = millis();
+    currentDirection = "SEARCH";
+    currentPath = "U";  
 
-      char dir = pathHistory[fixedPathIndex++];
-      if (fixedPathIndex >= pathHistory.length()) {
-        pathCompleted = true;
+    while (millis() - searchStart < SEARCH_TIMEOUT) {
+      if (preferRight) {
+        setMotor(MOTOR_PIN1, MOTOR_PIN2, BACKWARD, SEARCH_SPEED);
+        setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, SEARCH_SPEED);
+        currentLeftPWM = SEARCH_SPEED;
+        currentRightPWM = SEARCH_SPEED;
+      } else if (!preferRight) {
+        setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, SEARCH_SPEED);
+        setMotor(MOTOR_PIN3, MOTOR_PIN4, BACKWARD, SEARCH_SPEED);
+        currentLeftPWM = SEARCH_SPEED;
+        currentRightPWM = SEARCH_SPEED;
       }
 
-      currentPath = String(dir);
-      currentDirection = String(dir);
-
-      switch (dir) {
-        case 'R':
-          setMotor(MOTOR_PIN1, MOTOR_PIN2, BACKWARD, TURN_SPEED);
-          setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, TURN_SPEED - 10 + 15);
+      bool foundLine = false;
+      for (int i = 0; i < 8; i++) {
+        selectChannel(i);
+        if (analogRead(analogPin) < threshold) {
+          foundLine = true;
           break;
-        case 'L':
-          setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, TURN_SPEED - 10);
-          setMotor(MOTOR_PIN3, MOTOR_PIN4, BACKWARD, TURN_SPEED + 15);
-          break;
-        case 'S':
-          setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, SPEED_BASE);
-          setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, SPEED_BASE + 15);
-          break;
+        }
       }
-
-      delay(INTERSECTION_DELAY);
-      integral = 0;
-      lastIntersectionTime = millis();
+      if (foundLine) {
+        lastLineTime = millis();
+        break;
+      }
     }
-
-    else if (isRightTurn) {
-      setMotor(MOTOR_PIN1, MOTOR_PIN2, BACKWARD, TURN_SPEED);
-      setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, TURN_SPEED  + 15);
-      currentDirection = "RIGHT";
-      delay(50);
-      integral = 0;
+    if (millis() - searchStart >= SEARCH_TIMEOUT) {
+      stopMotors();
+      currentDirection = "TIMEOUT";
     }
-
-    else if (isLeftTurn) {
-      setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, TURN_SPEED);
-      setMotor(MOTOR_PIN3, MOTOR_PIN4, BACKWARD, TURN_SPEED  + 15);
-      currentDirection = "LEFT";
-      delay(50);
-      integral = 0;
-    }
-
-    else {
-      // Line following PID during path execution
-      float error = (float)weightedSum / sum;
-      integral += error;
-      float derivative = error - previousError;
-      float output = Kp * error + Ki * integral + Kd * derivative;
-      previousError = error;
-
-      int adjustment = output * scaler;
-      int leftSpeed = constrain(SPEED_BASE + adjustment, 0, 255);
-      int rightSpeed = constrain(SPEED_BASE - adjustment + 15, 0, 255);
-
-      setMotorSpeeds(leftSpeed, rightSpeed);
-      currentLeftPWM = leftSpeed;
-      currentRightPWM = rightSpeed;
-      currentDirection = "FORWARD";
-      currentPath = "-";
-    }
+    appendToPath(currentPath);
   }
 
-  // ==== SEARCH MODE ====
-  else if (!playMode) {
-
-    if ((sensorValues[2] < 380 && sensorValues[3] < 380) &&
-        (sensorValues[4] < 380 && sensorValues[5] < 380)) {
-      stopMotors();
-      currentDirection = "STOP";
-      currentPath = "-";
-    }
-
-    else if (!anySensorDetectsLine) {
-      unsigned long searchStart = millis();
-      currentDirection = "SEARCH";
-      currentPath = "U";
-
-      while (millis() - searchStart < SEARCH_TIMEOUT) {
-        setMotor(MOTOR_PIN1, MOTOR_PIN2, BACKWARD, SEARCH_SPEED);
-        setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, SEARCH_SPEED  + 15);
-
-        bool foundLine = false;
-        for (int i = 0; i < 8; i++) {
-          selectChannel(i);
-          if (analogRead(analogPin) < threshold) {
-            foundLine = true;
-            break;
-          }
-        }
-        if (foundLine) {
-          lastLineTime = millis();
-          break;
-        }
-      }
-
-      if (millis() - searchStart >= SEARCH_TIMEOUT) {
-        stopMotors();
-        currentDirection = "TIMEOUT";
-      }
-
-      appendToPath(currentPath);
-    }
-
-    else if (intersectionSide) {
+  else if (intersectionSide) {
+    // Both sides detected
+    if (preferRight) {
       currentDirection = "INT-SIDE";
-      if (preferRight) {
-        currentPath = "R";
-        setMotor(MOTOR_PIN1, MOTOR_PIN2, BACKWARD, TURN_SPEED);
-        setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, TURN_SPEED - 10 + 15);
-      } else {
-        currentPath = "L";
-        setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, TURN_SPEED - 10);
-        setMotor(MOTOR_PIN3, MOTOR_PIN4, BACKWARD, TURN_SPEED + 15);
-      }
-      appendToPath(currentPath);
-      delay(INTERSECTION_DELAY);
-      integral = 0;
-    }
-
-    else if ((preferRight && intersectionFrontLeft) || (!preferRight && intersectionFrontRight)) {
-      setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, SPEED_BASE);
-      setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, SPEED_BASE + 15);
-      currentDirection = "STRAIGHT";
-      currentPath = "S";
-      appendToPath(currentPath);
-      integral = 0;
-    }
-
-    else if ((preferRight && intersectionFrontRight) || (!preferRight && intersectionFrontLeft)) {
-      if (preferRight) {
-        setMotor(MOTOR_PIN1, MOTOR_PIN2, BACKWARD, TURN_SPEED);
-        setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, TURN_SPEED - 10 + 15);
-        currentDirection = "RIGHT";
-        currentPath = "R";
-      } else {
-        setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, TURN_SPEED - 10);
-        setMotor(MOTOR_PIN3, MOTOR_PIN4, BACKWARD, TURN_SPEED + 15);
-        currentDirection = "LEFT";
-        currentPath = "L";
-      }
-      appendToPath(currentPath);
-      delay(INTERSECTION_DELAY);
-      integral = 0;
-    }
-
-    else if (isRightTurn) {
+      currentPath = "R";
       setMotor(MOTOR_PIN1, MOTOR_PIN2, BACKWARD, TURN_SPEED);
-      setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, TURN_SPEED + 15);
-      currentDirection = "RIGHT";
-      delay(50);
-      integral = 0;
+      setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, TURN_SPEED - 10 + 15);
+    } else {
+      currentDirection = "INT-SIDE";
+      currentPath = "L";
+      setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, TURN_SPEED - 10);
+      setMotor(MOTOR_PIN3, MOTOR_PIN4, BACKWARD, TURN_SPEED + 15);
     }
+    appendToPath(currentPath);
+    delay(INTERSECTION_DELAY);
+    integral = 0;
+  }
 
-    else if (isLeftTurn) {
-      setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, TURN_SPEED);
+  else if ((preferRight && intersectionFrontLeft) || (!preferRight && intersectionFrontRight)) {
+    // Straight path on preferred side's front
+    setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, SPEED_BASE);
+    setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, SPEED_BASE + 15);
+    currentDirection = "STRAIGHT";
+    currentPath = "S";
+    appendToPath(currentPath);
+    integral = 0;
+  }
+
+  else if ((preferRight && intersectionFrontRight) || (!preferRight && intersectionFrontLeft)) {
+    // Turn toward preferred direction at intersection
+    if (preferRight) {
+      setMotor(MOTOR_PIN1, MOTOR_PIN2, BACKWARD, TURN_SPEED);
+      setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, TURN_SPEED - 10 + 15);
+      currentDirection = "RIGHT";
+      currentPath = "R";
+    } else {
+      setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, TURN_SPEED - 10);
       setMotor(MOTOR_PIN3, MOTOR_PIN4, BACKWARD, TURN_SPEED + 15);
       currentDirection = "LEFT";
-      delay(50);
-      integral = 0;
+      currentPath = "L";
     }
-    
-    else {
-      float error = (float)weightedSum / sum;
-      integral += error;
-      float derivative = error - previousError;
-      float output = Kp * error + Ki * integral + Kd * derivative;
-      previousError = error;
-
-      int adjustment = output * scaler;
-      int leftSpeed = constrain(SPEED_BASE + adjustment, 0, 255);
-      int rightSpeed = constrain(SPEED_BASE - adjustment + 15, 0, 255);
-
-      setMotorSpeeds(leftSpeed, rightSpeed);
-      currentLeftPWM = leftSpeed;
-      currentRightPWM = rightSpeed;
-      currentDirection = "FORWARD";
-      currentPath = "-";
-    }
+    appendToPath(currentPath);  // Save only when turning at intersections
+    delay(INTERSECTION_DELAY);
+    integral = 0;
   }
 
-  // OLED update
-  display.clearDisplay();
-  display.setCursor(0, 0);
-  display.print("MODE: ");
-  display.println(playMode ? "PLAY" : "SEARCH");
-  display.print("Dir: ");
-  display.println(currentDirection);
-  display.print("PWM L: ");
-  display.println(currentLeftPWM);
-  display.print("PWM R: ");
-  display.println(currentRightPWM);
-  display.print("Path: ");
-  display.println(pathHistory);
-  if (playMode) {
-    display.setCursor(0, 48);
-    display.print("Next: ");
-    if (pathCompleted) {
-      display.println("Done!");
-    } else {
-      for (int i = fixedPathIndex; i < pathHistory.length(); i++) {
-        display.print(pathHistory[i]);
-      }
-    }
+  else if (isRightTurn) {
+    // Regular right turn — move robot but DO NOT save path
+    setMotor(MOTOR_PIN1, MOTOR_PIN2, BACKWARD, TURN_SPEED);
+    setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, TURN_SPEED + 15);
+    currentDirection = "RIGHT";
+    // NO appendToPath here!
+    delay(30);
+    integral = 0;
   }
-  display.display();
+  else if (isLeftTurn) {
+    // Regular left turn — move robot but DO NOT save path
+    setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, TURN_SPEED);
+    setMotor(MOTOR_PIN3, MOTOR_PIN4, BACKWARD, TURN_SPEED + 15);
+    currentDirection = "LEFT";
+    // NO appendToPath here!
+    delay(30);
+    integral = 0;
+  }
+
+
+  else {
+    float error = (float)weightedSum / sum;
+    integral += error;
+    float derivative = error - previousError;
+    float output = Kp * error + Ki * integral + Kd * derivative;
+    previousError = error;
+
+    int adjustment = output * scaler;
+    int leftSpeed = constrain(SPEED_BASE + adjustment, 0, 255);
+    int rightSpeed = constrain(SPEED_BASE - adjustment + 15, 0, 255);
+
+    setMotorSpeeds(leftSpeed, rightSpeed);
+    currentLeftPWM = leftSpeed;
+    currentRightPWM = rightSpeed;
+    currentDirection = "FORWARD";
+    currentPath = "-";
+  }
+  displayStatus();
 }
 
 void setMotor(int pin1, int pin2, int direction, int speed) {
@@ -398,10 +351,27 @@ void stopMotors() {
   analogWrite(MOTOR_PIN4, 0);
   currentLeftPWM = 0;
   currentRightPWM = 0;
+  // Beep();
 }
 
 void selectChannel(int channel) {
   for (int i = 0; i < 3; i++) digitalWrite(selectPins[i], (channel >> i) & 1);
+}
+
+void displayStatus() {
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.print("Mode: ");
+  display.println(currentDirection);
+  display.print("Dir: "); 
+  display.println(currentDirection);
+  display.print("PWM L: "); 
+  display.println(currentLeftPWM);
+  display.print("PWM R: "); 
+  display.println(currentRightPWM);
+  display.print("Path: "); 
+  display.println(pathHistory);
+  display.display();
 }
 
 void appendToPath(String pathChar) {
@@ -412,17 +382,146 @@ void appendToPath(String pathChar) {
   }
 }
 
-String simplifyPath(String path) {
-  for (int i = 0; i < 5; i++) {
-    if (preferRight) {
-      path.replace("SUR", "L");
-      path.replace("RUR", "S");
-      path.replace("RUL", "U");
-    } else {
-      path.replace("SUL", "R");
-      path.replace("LUL", "S");
-      path.replace("LUR", "U");
-    }
+void Beep() {
+  for (int i = 0; i < 3; i++) {
+    digitalWrite(BUZZER_PIN, HIGH);
+    delay(10);
+    digitalWrite(BUZZER_PIN, LOW);
+    delay(10);
   }
-  return path;
+}
+
+
+
+void playMode() {
+  int sensorValues[8], weightedSum = 0, sum = 0;
+  bool anySensorDetectsLine = false, frontSensorsDetectLine = false;
+  bool isRightTurn = false, isLeftTurn = false;
+  bool intersectionAll = false;
+  bool intersectionSide = false;
+  bool intersectionFrontLeft = false;
+  bool intersectionFrontRight = false;
+
+  float weights[8] = {-3, -2, -1.2, -0.5, 0.5, 1.2, 2, 3};  
+
+  for (int i = 0; i < 8; i++) {
+    selectChannel(i);
+    int val = analogRead(analogPin);
+    sensorValues[i] = val;
+    if (val < threshold) {
+      anySensorDetectsLine = true;
+      lastLineTime = millis();
+    }
+
+    float weight = weights[i];
+    int sensorActive = (val < threshold) ? 1000 : 0;
+    weightedSum += sensorActive * weight;
+    sum += sensorActive;
+  }
+
+    bool rightSide = (sensorValues[0] < thresholdRight0 || sensorValues[1] < thresholdRight1);
+    frontSensorsDetectLine = (sensorValues[3] < thresholdFront3 || sensorValues[4] < thresholdFront4);
+    bool leftSide = (sensorValues[6] < thresholdLeft6 || sensorValues[7] < thresholdLeft7);
+    bool leftFront = frontSensorsDetectLine && leftSide;
+    bool rightFront = frontSensorsDetectLine && rightSide;
+
+
+  intersectionAll = frontSensorsDetectLine && leftSide && rightSide;
+  intersectionSide = leftSide && rightSide;
+  intersectionFrontLeft = leftFront;
+  intersectionFrontRight = rightFront;
+  isLeftTurn = leftSide && !frontSensorsDetectLine;
+  isRightTurn = rightSide && !frontSensorsDetectLine;
+
+  if (isLeftTurn || isRightTurn || intersectionSide || intersectionFrontLeft || intersectionFrontRight) {
+    delay(100);
+    for (int i = 0; i < 8; i++) {
+      selectChannel(i);
+      sensorValues[i] = analogRead(analogPin);
+    }
+
+    leftSide = (sensorValues[6] < thresholdLeft6 || sensorValues[7] < thresholdLeft7);
+    frontSensorsDetectLine = (sensorValues[3] < thresholdFront3 || sensorValues[4] < thresholdFront4);
+    rightSide = (sensorValues[0] < thresholdRight0 || sensorValues[1] < thresholdRight1);
+    leftFront = frontSensorsDetectLine && leftSide;
+    rightFront = frontSensorsDetectLine && rightSide;
+
+
+    intersectionSide = leftSide && rightSide;
+    intersectionFrontLeft = leftFront;
+    intersectionFrontRight = rightFront;
+    isLeftTurn = leftSide && !frontSensorsDetectLine;
+    isRightTurn = rightSide && !frontSensorsDetectLine;
+  }
+
+  if ((sensorValues[2] < 350 && sensorValues[3] < 150) && (sensorValues[4] < 150 && sensorValues[5] < 350)) {
+    stopMotors();
+    currentDirection = "STOP";
+    currentPath = "-";
+  }
+
+  else if (isRightTurn) {
+    setMotor(MOTOR_PIN1, MOTOR_PIN2, BACKWARD, TURN_SPEED);
+    setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, TURN_SPEED + 15);
+    currentDirection = "RIGHT";
+    delay(40);
+    integral = 0;
+  }
+
+  else if (isLeftTurn) {
+    setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, TURN_SPEED);
+    setMotor(MOTOR_PIN3, MOTOR_PIN4, BACKWARD, TURN_SPEED + 15);
+    currentDirection = "LEFT";
+    delay(40);
+    integral = 0;
+  }
+
+  else if ((intersectionSide || intersectionFrontLeft || intersectionFrontRight) && !pathCompleted && millis() - lastIntersectionTime > INTERSECTION_COOLDOWN) {
+    char dir = pathHistory[fixedPathIndex];
+    fixedPathIndex++;
+    if (fixedPathIndex >= pathHistory.length()) pathCompleted = true;
+
+    currentPath = String(dir);
+    currentDirection = String(dir);
+
+    switch (dir) {
+      case 'R':
+        setMotor(MOTOR_PIN1, MOTOR_PIN2, BACKWARD, TURN_SPEED);
+        setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, TURN_SPEED - 10 + 15);
+        break;
+      case 'L':
+        setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, TURN_SPEED - 10 + 15);
+        setMotor(MOTOR_PIN3, MOTOR_PIN4, BACKWARD, TURN_SPEED);
+        break;
+      case 'S':
+        setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, SPEED_BASE);
+        setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, SPEED_BASE + 15);
+        break;
+    }
+
+    appendToPath(currentPath);
+    delay(INTERSECTION_DELAY);
+    integral = 0;
+    lastIntersectionTime = millis();
+  }
+
+  else {
+    float error = (float)weightedSum / sum;
+    integral += error;
+    float derivative = error - previousError;
+    float output = Kp * error + Ki * integral + Kd * derivative;
+    previousError = error;
+
+    int adjustment = output * scaler;
+    int leftSpeed = constrain(SPEED_BASE + adjustment, 0, 255);
+    int rightSpeed = constrain(SPEED_BASE - adjustment + 15, 0, 255);
+
+    setMotorSpeeds(leftSpeed, rightSpeed);
+    currentLeftPWM = leftSpeed;
+    currentRightPWM = rightSpeed;
+    currentDirection = "FORWARD";
+    currentPath = "-";
+  }
+
+  displayStatus();
 }
