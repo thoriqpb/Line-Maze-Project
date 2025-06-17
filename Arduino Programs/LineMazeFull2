@@ -184,7 +184,7 @@ void searchMode() {
 
   // === Confirm side detection with delay ===
   if (isLeftTurn || isRightTurn || intersectionSide || intersectionFrontLeft || intersectionFrontRight) {
-    delay(80);  // Confirm before acting
+    delay(100);  // Confirm before acting
 
     // Re-read sensors
     for (int i = 0; i < 8; i++) {
