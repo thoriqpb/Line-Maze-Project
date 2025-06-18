@@ -1,4 +1,4 @@
-// mode PWM 70
+// mode PWM 100
 #define MOTOR_PIN1 5    // Motor A IN1 (Right)
 #define MOTOR_PIN2 6    // Motor A IN2 (Right)
 #define MOTOR_PIN3 11     // Motor B IN1 (Left)
