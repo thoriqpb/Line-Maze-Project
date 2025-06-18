@@ -6,7 +6,7 @@
 
 const int selectPins[] = {2, 3, 4}; 
 const int analogPin = A0;           
-const int threshold = 250;          
+const int thresholds[8] = {600, 300, 250, 150, 150, 300, 230, 230}; // Customize as needed
 const int SPEED_BASE = 50;         
 
 const float scaler = 17;       
@@ -25,73 +25,126 @@ void setup() {
 }
 
 void loop() {
-  int sensorValues[8], weightedSum = 0, sum = 0;
-  bool anySensorDetectsLine = false, allSensorsDetectLine = true;
+  int activeBlackCount = 0;
 
-  // Declare the weights array ONCE, outside the loop, as float
-  float weights[8] = {-4, -2.5, -1.0, -0.5, 0.5, 1.0, 2.5, 4};  
+  // Scan all sensors to check how many detect black (val < threshold)
+  for (int i = 0; i < 8; i++) {
+    selectChannel(i);
+    int val = analogRead(analogPin);
+    if (val < thresholds[i]) {
+      activeBlackCount++;
+    }
+  }
+
+  // Decide mode based on how many sensors detect black line
+  if (activeBlackCount <= 2 && activeBlackCount > 0) {
+    blackMode();  // Only 1 or 2 sensors see black → black line mode
+  } else {
+    whiteMode();  // More sensors or all see black → white line mode
+  }
+}
+
+
+void blackMode() {
+  int sensorValues[8];
+  float weights[8] = {-2.3, -2.0, -1.0, -0.4, 0.4, 1.0, 2.0, 2.3};  
+  float weightedSum = 0;
+  int sum = 0;
 
   for (int i = 0; i < 8; i++) {
     selectChannel(i);
     int val = analogRead(analogPin);
     sensorValues[i] = val;
-    if (val < threshold) anySensorDetectsLine = true;
-    else allSensorsDetectLine = false;
-
-    float weight = weights[i];  // Use the float weight
-    int sensorActive = (val < threshold) ? 1000 : 0;
-    weightedSum += sensorActive * weight;
+    
+    int sensorActive = (val < thresholds[i]) ? 1000 : 0;
+    weightedSum += sensorActive * weights[i];
     sum += sensorActive;
-}
+  }
 
+  // Optional: Print sensor values for debugging
   for (int i = 0; i < 8; i++) {
-  Serial.print(sensorValues[i]);
-  Serial.print("\t");
+    Serial.print(sensorValues[i]);
+    Serial.print("\t");
   }
 
-  if (allSensorsDetectLine) {
-  stopMotors();
-  Serial.println("stop");
-  }
-  else if (anySensorDetectsLine && sum != 0) {
-    float error = (float)weightedSum / sum;
-    integral += error;
-    float derivative = error - previousError;
-    float output = Kp * error + Ki * integral + Kd * derivative;
-    previousError = error;
-
-    int adjustment = output * scaler;
-    int leftSpeed = constrain(SPEED_BASE + adjustment, 0, 255);
-    int rightSpeed = constrain(SPEED_BASE - adjustment, 0, 255);
-
-    setMotorSpeeds(leftSpeed, rightSpeed);
-
-    Serial.print("PID: ");
-    Serial.print(output);
-    Serial.print("\tPWM Right: ");
-    Serial.print(leftSpeed);
-    Serial.print("\tPWM Left: ");
-    Serial.println(rightSpeed);
-  }
-  else {
-    delay(70);
-    stopMotors();
-    Serial.println("stop");
+  float error = 0;
+  if (sum != 0) {
+    error = weightedSum / sum;
   }
 
-  // delay(10);
+  integral += error;
+  float derivative = error - previousError;
+  float output = Kp * error + Ki * integral + Kd * derivative;
+  previousError = error;
+
+  int adjustment = output * scaler;
+  int leftSpeed = constrain(SPEED_BASE + adjustment, 0, 255);
+  int rightSpeed = constrain(SPEED_BASE - adjustment, 0, 255);
+
+  setMotorSpeeds(leftSpeed, rightSpeed);
+
+  Serial.print("PID: ");
+  Serial.print(output);
+  Serial.print("\tPWM Right: ");
+  Serial.print(leftSpeed);
+  Serial.print("\tPWM Left: ");
+  Serial.println(rightSpeed);
 }
+
+
 
 void setMotorSpeeds(int leftSpeed, int rightSpeed) {
   analogWrite(MOTOR_PIN1, leftSpeed); analogWrite(MOTOR_PIN2, 0);
   analogWrite(MOTOR_PIN3, rightSpeed + 12); analogWrite(MOTOR_PIN4, 0);
 }
 
-void stopMotors() {
-  analogWrite(MOTOR_PIN1, SPEED_BASE); analogWrite(MOTOR_PIN2, 0);
-  analogWrite(MOTOR_PIN3, SPEED_BASE + 12); analogWrite(MOTOR_PIN4, 0);
-}
-
 void selectChannel(int channel) {
   for (int i = 0; i < 3; i++) digitalWrite(selectPins[i], (channel >> i) & 1);
+}
+
+void whiteMode() {
+  int sensorValues[8];
+  float weights[8] = {-2.3, -2.0, -1.0, -0.4, 0.4, 1.0, 2.0, 2.3};  
+  float weightedSum = 0;
+  int sum = 0;
+
+  for (int i = 0; i < 8; i++) {
+    selectChannel(i);
+    int val = analogRead(analogPin);
+    sensorValues[i] = val;
+
+    // Inverted logic for white line on black background
+    int sensorActive = (val > thresholds[i]) ? 1000 : 0;
+    weightedSum += sensorActive * weights[i];
+    sum += sensorActive;
+  }
+
+  // Optional: Print sensor values for debugging
+  for (int i = 0; i < 8; i++) {
+    Serial.print(sensorValues[i]);
+    Serial.print("\t");
+  }
+
+  float error = 0;
+  if (sum != 0) {
+    error = weightedSum / sum;
+  }
+
+  integral += error;
+  float derivative = error - previousError;
+  float output = Kp * error + Ki * integral + Kd * derivative;
+  previousError = error;
+
+  int adjustment = output * scaler;
+  int leftSpeed = constrain(SPEED_BASE + adjustment, 0, 255);
+  int rightSpeed = constrain(SPEED_BASE - adjustment, 0, 255);
+
+  setMotorSpeeds(leftSpeed, rightSpeed);
+
+  Serial.print("PID: ");
+  Serial.print(output);
+  Serial.print("\tPWM Right: ");
+  Serial.print(leftSpeed);
+  Serial.print("\tPWM Left: ");
+  Serial.println(rightSpeed);
 }
