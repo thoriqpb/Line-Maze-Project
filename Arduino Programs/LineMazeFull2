@@ -17,15 +17,15 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 #define FORWARD 1
 #define BACKWARD 0
 
-// === Thresholds for individual sensors ===
-int thresholdRight0 = 550;
-int thresholdRight1 = 380;
+// === Thresholds for individual sensors === -100
+int thresholdRight0 = 460;
+int thresholdRight1 = 330;
 
 int thresholdFront3 = 150;
 int thresholdFront4 = 150;
 
-int thresholdLeft6 = 520;
-int thresholdLeft7 = 400;
+int thresholdLeft6 = 490;
+int thresholdLeft7 = 380;
 
 // Sensor and control configuration
 const int selectPins[] = {2, 3, 4}; 
@@ -52,7 +52,7 @@ const unsigned long INTERSECTION_COOLDOWN = 1000;  // ms
 
 String currentDirection = "STOP";
 String currentPath = "-";
-String pathHistory = "SURRSURRUR"; // Maximum 10
+String pathHistory = ""; // Maximum 10
 // int currentLeftPWM = 0;
 // int currentRightPWM = 0;
 
@@ -212,22 +212,22 @@ void searchMode() {
     currentPath = "-";
   }
   else if (!anySensorDetectsLine) {
-    // delay(20);
     unsigned long searchStart = millis();
     currentDirection = "SEARCH";
-    currentPath = "U";  
+
+    // Check if last move was also a "U"
+    if (pathHistory.length() == 0 || pathHistory.charAt(pathHistory.length() - 1) != 'U') {
+      currentPath = "U";
+      appendToPath(currentPath);
+    }
 
     while (millis() - searchStart < SEARCH_TIMEOUT) {
       if (preferRight) {
         setMotor(MOTOR_PIN1, MOTOR_PIN2, BACKWARD, SEARCH_SPEED);
         setMotor(MOTOR_PIN3, MOTOR_PIN4, FORWARD, SEARCH_SPEED);
-        // currentLeftPWM = SEARCH_SPEED;
-        // currentRightPWM = SEARCH_SPEED;
-      } else if (!preferRight) {
+      } else {
         setMotor(MOTOR_PIN1, MOTOR_PIN2, FORWARD, SEARCH_SPEED);
         setMotor(MOTOR_PIN3, MOTOR_PIN4, BACKWARD, SEARCH_SPEED);
-        // currentLeftPWM = SEARCH_SPEED;
-        // currentRightPWM = SEARCH_SPEED;
       }
 
       bool foundLine = false;
@@ -243,12 +243,13 @@ void searchMode() {
         break;
       }
     }
+
     if (millis() - searchStart >= SEARCH_TIMEOUT) {
       stopMotors();
       currentDirection = "TIMEOUT";
     }
-    appendToPath(currentPath);
   }
+
 
   else if (intersectionSide) {
     // Both sides detected
