@@ -1,4 +1,4 @@
-// mode PWM 100
+// mode PWM 80
 #define MOTOR_PIN1 5    // Motor A IN1 (Right)
 #define MOTOR_PIN2 6    // Motor A IN2 (Right)
 #define MOTOR_PIN3 11     // Motor B IN1 (Left)
@@ -7,7 +7,7 @@
 const int selectPins[] = {2, 3, 4}; 
 const int analogPin = A0;           
 const int thresholds[8] = {600, 300, 250, 150, 150, 300, 230, 230}; // Customize as needed
-const int SPEED_BASE = 100;         
+const int SPEED_BASE = 80;         
 
 const float scaler = 17;       
 const float Kp = 1.0;               
@@ -18,7 +18,7 @@ float previousError = 0;
 float integral = 0;                 
 
 unsigned long lastSharpTurnTime = 0;
-const unsigned long sharpTurnCooldown = 50;  // milliseconds between turns
+const unsigned long sharpTurnCooldown = 30;  // milliseconds between turns
 
 void setup() {
   Serial.begin(9600);
@@ -161,14 +161,14 @@ void sharpTurn() {
   if (leftDetected && !rightDetected) {
     Serial.println("Sharp LEFT Turn");
     while (!frontSensorDetecting()) {
-      setMotorSpeeds(0, 100);  // Turn left
+      setMotorSpeeds(0, 120);  // Turn left
     }
     lastSharpTurnTime = millis();  // Update cooldown after successful turn
   } 
   else if (rightDetected && !leftDetected) {
     Serial.println("Sharp RIGHT Turn");
     while (!frontSensorDetecting()) {
-      setMotorSpeeds(100, 0);  // Turn right
+      setMotorSpeeds(120, 0);  // Turn right
     }
     lastSharpTurnTime = millis();
   }
@@ -182,5 +182,4 @@ void setMotorSpeeds(int leftSpeed, int rightSpeed) {
 void selectChannel(int channel) {
   for (int i = 0; i < 3; i++) digitalWrite(selectPins[i], (channel >> i) & 1);
 }
-
 
